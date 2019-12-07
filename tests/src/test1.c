@@ -1,25 +1,28 @@
-#include <stdint.h>
+// C program for implementation of Bubble sort 
+#include <stdio.h> 
+  
+// Driver program to test above functions 
+int main() 
+{ 
+    char a, b, c, d, e, f, g, h;
+    a = 'a';
+    b = 'b';
+    c = 'c';
+    d = 'd';
+    e = 'e';
+    f = 'f';
+    g = 'g';
+    h = 'h';
+    int sum = 0;
+    for (int k = 0;  k < 10; ++k) {
 
-struct BigStruct {
-  uint64_t a;
-  uint64_t b;
-  uint64_t c;
-};
-
-struct LargerStruct {
-	struct BigStruct a;
-	struct BigStruct b;
-};
-
-int main() {
-  char* val = malloc(sizeof(int)*50);
-  struct LargerStruct d;
-  d.a.a = 20;
-  int sum = 0;
-  for (int i = 0; i < 10; ++i) {
-	  printf("%d\n", d.a.a);
-	  sum += i;
-  }
-printf("%d\n", sum);
-  return 0;
-}
+        if (k < 5) {
+            sum += a + b + c + d;
+        }
+        else {
+            sum += e + f + g + h;
+        }
+        printf("%d\n", sum);
+    }
+    
+} 
