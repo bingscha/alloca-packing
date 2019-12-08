@@ -14,10 +14,17 @@
 
 using namespace llvm;
 
+using std::pair;
 using std::unordered_map;
 using std::vector;
 
 namespace {
+    struct SoftwareRegister {
+        vector<AllocaInst*> correspondingAllocs;
+        int size = 0;
+    };
+
+
     struct AllocaPackPass : public FunctionPass {
         static char ID;
         AllocaPackPass() : FunctionPass(ID) {}
@@ -27,24 +34,30 @@ namespace {
         }
 
         virtual bool runOnFunction(Function &F) {
-            unordered_map<uint64_t, vector<AllocaInst*>> size_to_allocas;
             vector<AllocaInst*> all_allocas;
             unordered_map<AllocaInst*, unordered_map<AllocaInst*, int>> alloca_to_score;
-            findAlloca(F, size_to_allocas, all_allocas);
-            alloca_to_score = getSimilarUses(F, size_to_allocas, all_allocas);
+            findAlloca(F, all_allocas);
+            alloca_to_score = getSimilarUses(F, all_allocas);
 
-            for (auto& temp : alloca_to_score) {
-                errs() << *(temp.first) << "\n";
-                for (auto& val : temp.second) {
-                    errs() << "\t" << *(val.first) << " " << val.second <<  "\n";
-                }
-            }
-            packAlloca(F, size_to_allocas, all_allocas);
+            // for (auto& temp : alloca_to_score) {
+            //     errs() << *(temp.first) << "\n";
+            //     for (auto& val : temp.second) {
+            //         errs() << "\t" << *(val.first) << " " << val.second <<  "\n";
+            //     }
+            // }
 
+            packAlloca(F, all_allocas, alloca_to_score);
+
+            // Fix up, algorithm:
+            //  For each uses, we add load where it was used before
+            //      If load already exists, use that piece of memory
+            //  If any stores happen, store at the end
+            //      Change the memory in place
+            //  All changes get fixed in between
             return false;
         }
 
-        void findAlloca(Function& F, unordered_map<uint64_t, vector<AllocaInst*>>& size_to_allocas, vector<AllocaInst*>& all_allocas) {
+        void findAlloca(Function& F, vector<AllocaInst*>& all_allocas) {
             for (BasicBlock& bb : F) {
                 for (Instruction& i : bb) {
                     // Get infomration on Alloca's
@@ -52,21 +65,16 @@ namespace {
                         auto sz = alloc->getAllocationSizeInBits(F.getParent()->getDataLayout());
                         // Only get data that is less than 64 bits
                         if (sz.hasValue() && sz.getValue() < 64) {
-                            size_to_allocas[sz.getValue()].push_back(alloc);
                             all_allocas.push_back(alloc);
                         }
                     }
                 }
             }
 
-            for (auto& val : size_to_allocas) {
-                for (auto a : val.second)
-                    errs() << val.first << " " << *a << "\n";
-            }
         }
 
         // For each alloca, find all similar uses (same BB)
-        unordered_map<AllocaInst*, unordered_map<AllocaInst*, int>> getSimilarUses(Function& F, unordered_map<uint64_t, vector<AllocaInst*>>& size_to_allocas, vector<AllocaInst*>& all_allocas) {
+        unordered_map<AllocaInst*, unordered_map<AllocaInst*, int>> getSimilarUses(Function& F, vector<AllocaInst*>& all_allocas) {
             // Matrix to determine which alloca's have the most in common uses with another alloca i.e. their uses are in the same BB
             unordered_map<AllocaInst*, unordered_map<AllocaInst*, int>> alloca_to_score;
             const DataLayout& dl = F.getParent()->getDataLayout();
@@ -102,8 +110,93 @@ namespace {
         }
 
         // Pack allocas that are closest in basic blocks
-        void packAlloca(Function& F, unordered_map<uint64_t, vector<AllocaInst*>>& size_to_allocas, vector<AllocaInst*>& all_allocas) {
+        void packAlloca(Function& F, vector<AllocaInst*>& all_allocas, unordered_map<AllocaInst*, unordered_map<AllocaInst*, int>>& alloca_to_score) {
+            unordered_map<AllocaInst*, SoftwareRegister> packed_registers;
+            const DataLayout& dl = F.getParent()->getDataLayout();
 
+            for (AllocaInst* alloc : all_allocas) {
+                packed_registers[alloc].correspondingAllocs.push_back(alloc);
+                packed_registers[alloc].size = alloc->getAllocationSizeInBits(dl).getValue();
+            }
+            
+            while (alloca_to_score.size()) {
+                auto largest = getLargestScore(alloca_to_score);
+                
+                // Add this alloca to the prev
+                packed_registers[largest.first].correspondingAllocs.insert(packed_registers[largest.first].correspondingAllocs.begin(),
+                                                                           packed_registers[largest.second].correspondingAllocs.begin(),
+                                                                           packed_registers[largest.second].correspondingAllocs.end());
+                packed_registers[largest.first].size += packed_registers[largest.second].size;
+                //errs() << "combining\n" << *(largest.first) << "\n" << *(largest.second) << "\n" << packed_registers[largest.first].size << "\n";
+                assert(packed_registers[largest.first].size <= 64);
+                packed_registers.erase(largest.second);
+
+                // iterate through the second one
+                for (auto& to_remove : alloca_to_score[largest.second]) {
+                    uint64_t size = packed_registers[to_remove.first].size;
+
+                    // If this is less than, we can add to the score
+                    if (size + packed_registers[largest.first].size <= 64 && to_remove.first != largest.first) {
+                        alloca_to_score[largest.first][to_remove.first] += to_remove.second;
+                    }
+                }
+
+                // Erase second
+                alloca_to_score.erase(largest.second);
+
+                // Check if second exists anywhere else and erase
+                for (auto& vals : alloca_to_score) {
+                    if (vals.second.count(largest.second)) {
+                        vals.second.erase(largest.second);
+                    }
+                }
+
+                // Iterate through first and remove if necessary
+                for (auto it = alloca_to_score[largest.first].begin(); it != alloca_to_score[largest.first].end();) {
+                    uint64_t size = packed_registers[it->first].size;
+                    
+                    if (size + packed_registers[largest.first].size > 64) {
+                        auto prev = it;
+                        it++;
+                        alloca_to_score[largest.first].erase(prev);
+                        alloca_to_score[prev->first].erase(largest.first);
+                        if (alloca_to_score[prev->first].empty()) {
+                            alloca_to_score.erase(prev->first);
+                        }
+                    }
+                    else {
+                        it++;
+                    }
+                }
+
+                if (alloca_to_score[largest.first].empty()) {
+                    alloca_to_score.erase(largest.first);
+                }
+            }
+
+            for (auto& temp : packed_registers) {
+                errs() << *(temp.first) << " " << temp.second.size << "\n";
+                for (auto& val : temp.second.correspondingAllocs) {
+                    errs() << "\t" << *(val) << "\n";
+                }
+            }
+        }
+
+        pair<AllocaInst*, AllocaInst*> getLargestScore(unordered_map<AllocaInst*, unordered_map<AllocaInst*, int>>& alloca_to_score) {
+            int top_score = 0;
+            AllocaInst* first, *second;
+
+            for (auto& row : alloca_to_score) {
+                for (auto& col : row.second) {
+                    if (col.second > top_score) {
+                        first = row.first;
+                        second = col.first;
+                        top_score = col.second;
+                    }
+                }
+            }
+
+            return { first, second };
         }
     };
 }
