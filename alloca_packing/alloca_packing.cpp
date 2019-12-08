@@ -2,6 +2,7 @@
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/InstrTypes.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/Support/Format.h"
@@ -10,17 +11,19 @@
 #include "llvm/Analysis/BranchProbabilityInfo.h"
 
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 using namespace llvm;
 
 using std::pair;
 using std::unordered_map;
+using std::unordered_set;
 using std::vector;
 
 namespace {
     struct SoftwareRegister {
-        vector<AllocaInst*> correspondingAllocs;
+        unordered_map<AllocaInst*, pair<int,int>> bit_ranges;
         int size = 0;
     };
 
@@ -46,15 +49,25 @@ namespace {
             //     }
             // }
 
-            packAlloca(F, all_allocas, alloca_to_score);
-
-            // Fix up, algorithm:
-            //  For each uses, we add load where it was used before
-            //      If load already exists, use that piece of memory
-            //  If any stores happen, store at the end
-            //      Change the memory in place
-            //  All changes get fixed in between
-            return false;
+            unordered_map<AllocaInst*, SoftwareRegister> packed = packAlloca(F, all_allocas, alloca_to_score);
+            int sum = 0;
+            for (auto it = packed.begin(); it != packed.end(); ) {
+                int num = it->second.bit_ranges.size();
+                assert(num >= 1);
+                if (num < 2) {
+                    auto prev = it;
+                    it++;
+                    packed.erase(prev);
+                } 
+                else {
+                    it++;
+                }
+                sum += num;
+            }
+            assert(sum == all_allocas.size());
+            fixUpCode(F, packed);
+            
+            return true;
         }
 
         void findAlloca(Function& F, vector<AllocaInst*>& all_allocas) {
@@ -110,23 +123,27 @@ namespace {
         }
 
         // Pack allocas that are closest in basic blocks
-        void packAlloca(Function& F, vector<AllocaInst*>& all_allocas, unordered_map<AllocaInst*, unordered_map<AllocaInst*, int>>& alloca_to_score) {
+        unordered_map<AllocaInst*, SoftwareRegister> packAlloca(Function& F, vector<AllocaInst*>& all_allocas, unordered_map<AllocaInst*, unordered_map<AllocaInst*, int>>& alloca_to_score) {
             unordered_map<AllocaInst*, SoftwareRegister> packed_registers;
             const DataLayout& dl = F.getParent()->getDataLayout();
 
             for (AllocaInst* alloc : all_allocas) {
-                packed_registers[alloc].correspondingAllocs.push_back(alloc);
-                packed_registers[alloc].size = alloc->getAllocationSizeInBits(dl).getValue();
+                auto size = alloc->getAllocationSizeInBits(dl).getValue();
+                packed_registers[alloc].bit_ranges[alloc] = { 0, size };
+                packed_registers[alloc].size = size;
             }
             
             while (alloca_to_score.size()) {
                 auto largest = getLargestScore(alloca_to_score);
                 
                 // Add this alloca to the prev
-                packed_registers[largest.first].correspondingAllocs.insert(packed_registers[largest.first].correspondingAllocs.begin(),
-                                                                           packed_registers[largest.second].correspondingAllocs.begin(),
-                                                                           packed_registers[largest.second].correspondingAllocs.end());
-                packed_registers[largest.first].size += packed_registers[largest.second].size;
+                for (auto& adding_alloc : packed_registers[largest.second].bit_ranges) {
+                    auto& curr_size = packed_registers[largest.first].size;
+                    auto alloc_size = adding_alloc.first->getAllocationSizeInBits(dl).getValue();
+                    packed_registers[largest.first].bit_ranges[adding_alloc.first] = { curr_size, curr_size + alloc_size };
+                    curr_size += alloc_size;
+                }
+
                 //errs() << "combining\n" << *(largest.first) << "\n" << *(largest.second) << "\n" << packed_registers[largest.first].size << "\n";
                 assert(packed_registers[largest.first].size <= 64);
                 packed_registers.erase(largest.second);
@@ -176,10 +193,12 @@ namespace {
 
             for (auto& temp : packed_registers) {
                 errs() << *(temp.first) << " " << temp.second.size << "\n";
-                for (auto& val : temp.second.correspondingAllocs) {
-                    errs() << "\t" << *(val) << "\n";
+                for (auto& val : temp.second.bit_ranges) {
+                    errs() << "\t" << *(val.first) << " "  << val.second.first << " " << val.second.second << "\n";
                 }
             }
+
+            return packed_registers;
         }
 
         pair<AllocaInst*, AllocaInst*> getLargestScore(unordered_map<AllocaInst*, unordered_map<AllocaInst*, int>>& alloca_to_score) {
@@ -197,6 +216,96 @@ namespace {
             }
 
             return { first, second };
+        }
+
+        void fixUpCode(Function& F, unordered_map<AllocaInst*, SoftwareRegister>& packed) {
+            // 1. Create the new allocas
+            static LLVMContext context_s;
+            unordered_map<AllocaInst*, AllocaInst*> old_to_new_allocas;
+            unordered_map<AllocaInst*, SoftwareRegister> new_to_packed;
+            for (auto& elt : packed) {
+                auto new_alloca = new AllocaInst(Type::getInt64Ty(context_s), 0, "cursed", elt.first);
+                new_to_packed[new_alloca] = elt.second;
+                for (auto& packing : elt.second.bit_ranges) {
+                    old_to_new_allocas[packing.first] = new_alloca;
+                }
+            }
+
+            // 2.
+            // Iterate through each BB and load our new variable if necessary
+            for (auto& BB : F) {
+                unordered_map<AllocaInst*, unordered_set<AllocaInst*>> new_to_needed;
+
+                // Determine which alloca inst are needed
+                for (Instruction& I : BB) {
+                    AllocaInst* isAlloca = nullptr;
+                    if (LoadInst* load = dyn_cast<LoadInst>(&I)) {
+                        isAlloca = dyn_cast<AllocaInst>(load->getPointerOperand());
+                        // errs() << *(load->getPointerOperand()) << "\n";
+                    }
+                    if (!isAlloca) {
+                        continue;
+                    }
+                    // at this point, guaranteed to be dealing with our alloca boi
+                    //errs() << *isAlloca << "\n";
+                    auto it = old_to_new_allocas.find(isAlloca);
+                    if (it != old_to_new_allocas.end()) {
+                        //errs() << "INSERTING\n" << "\n";
+                        new_to_needed[it->second].insert(isAlloca);
+                    } 
+                }
+                // errs() << "REACHED: " << new_to_needed.size() << "\n";
+                //3.
+                // add loads to the beginning of basic block and extract variables
+
+                //to_load is <new, needed vector>
+                for (auto& to_load : new_to_needed) {
+                    Instruction* to_insert = &(BB.getInstList().front());
+                    while (dyn_cast<AllocaInst>(to_insert)) {
+                        to_insert = to_insert->getNextNode();
+                    }
+
+                    LoadInst* load = new LoadInst(to_load.first);
+                    load->insertBefore(to_insert);
+
+                    auto& bit_ranges = new_to_packed[to_load.first].bit_ranges;
+                    //extract each needed
+                    for (auto alloca_inst : to_load.second) {
+                        int start = bit_ranges[alloca_inst].first, end = bit_ranges[alloca_inst].second;
+
+                        // only shift right if you actually need to
+                        Instruction* shr = nullptr;
+                        if (start != 0) {
+                            shr = BinaryOperator::CreateAShr(load, ConstantInt::get(Type::getInt64Ty(context_s), start));
+                            shr->insertAfter(load);
+
+                            errs() << "Shift RIGHT" << *shr << "\n";
+                        }
+                        int64_t mask_value = -1 + (1L << (end  - start));
+                        // errs() << end << " " << start << "\n";
+                        Instruction* and_instr = BinaryOperator::CreateAnd(start == 0 ? load : shr, ConstantInt::get(Type::getInt64Ty(context_s), mask_value));
+                        and_instr->insertAfter(start == 0 ? load : shr);
+                        errs() << "And with " << *and_instr << "\n";
+
+                        // TODO potentially insert convert here as well?
+                        
+                    }
+                    
+                }
+
+                for (Instruction& I : BB) {
+                    AllocaInst* isAlloca = nullptr;
+                    if (StoreInst* store = dyn_cast<StoreInst>(&I)) {
+                        isAlloca = dyn_cast<AllocaInst>(store->getPointerOperand());
+                        
+                    }
+                    else if (LoadInst* load = dyn_cast<LoadInst>(&I)) {
+                        isAlloca = dyn_cast<AllocaInst>(load->getPointerOperand());
+                        
+                    }
+                }
+            }
+            
         }
     };
 }
