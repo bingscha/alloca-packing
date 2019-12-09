@@ -20,9 +20,9 @@ opt -load ${PATH_MYPASS} ${NAME_MYPASS} < test1.bc > new_test.bc
 
 opt -load ${PATH_MYPASS} ${NAME_MYPASS} -dce < test1.bc > new_test_with_dce.bc
 
-clang test1.bc -o test1
-clang new_test.bc -o new_test
-clang new_test_with_dce.bc -o new_test_with_dce
+clang -O2 test1.bc -o test1
+clang -O2 new_test.bc -o new_test
+clang -O2 new_test_with_dce.bc -o new_test_with_dce
 echo ""
 echo "Baseline"
 time ./test1 > out
