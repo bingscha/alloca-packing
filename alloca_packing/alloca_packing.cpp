@@ -257,29 +257,33 @@ namespace {
             // Iterate through each BB and load our new variable if necessary
             for (auto& BB : F) {
                 unordered_map<AllocaInst*, unordered_set<AllocaInst*>> new_to_needed;
+                unordered_set<AllocaInst*> used;
 
                 // Determine which alloca inst are needed
                 for (Instruction& I : BB) {
                     AllocaInst* isAlloca = nullptr;
                     if (LoadInst* load = dyn_cast<LoadInst>(&I)) {
                         isAlloca = dyn_cast<AllocaInst>(load->getPointerOperand());
+
+                        // at this point, guaranteed to be dealing with our alloca boi
+                        auto it = old_to_new_allocas.find(isAlloca);
+                        if (it != old_to_new_allocas.end() && !used.count(isAlloca)) {
+                            // used.insert(isAlloca);
+                            new_to_needed[it->second].insert(isAlloca);
+                        } 
                     }
                     if (StoreInst* store = dyn_cast<StoreInst>(&I)) {
                         isAlloca = dyn_cast<AllocaInst>(store->getPointerOperand());
                         // at this point, guaranteed to be dealing with our alloca boi
                         auto it = old_to_new_allocas.find(isAlloca);
-                        if (it != old_to_new_allocas.end() && !new_to_needed.count(it->second)) {
-                            new_to_needed[it->second] = unordered_set<AllocaInst*>();
+                        if (it != old_to_new_allocas.end()) {
+                            // used.insert(isAlloca);
+                            if (!new_to_needed.count(it->second)) {
+                                new_to_needed[it->second] = unordered_set<AllocaInst*>();
+                            }
                         }
                     }
-                    if (!isAlloca) {
-                        continue;
-                    }
-                    // at this point, guaranteed to be dealing with our alloca boi
-                    auto it = old_to_new_allocas.find(isAlloca);
-                    if (it != old_to_new_allocas.end()) {
-                        new_to_needed[it->second].insert(isAlloca);
-                    } 
+
                 }
 
                 //keep track of last value
@@ -334,7 +338,7 @@ namespace {
                         and_instr->insertAfter(start == 0 ? load : shr);
                         errs() << "And with " << *(and_instr) << "\n";
 
-                        auto opcode = CastInst::getCastOpcode(and_instr, true, alloca_inst->getAllocatedType(), (dyn_cast<IntegerType>(alloca_inst->getAllocatedType())) ? true : false);
+                        auto opcode = CastInst::getCastOpcode(and_instr, false, alloca_inst->getAllocatedType(), false);
                         Instruction* cast_instr = CastInst::Create(opcode, and_instr, alloca_inst->getAllocatedType());
                         cast_instr->insertAfter(and_instr);
                         errs() << "Cast instr " << *cast_instr << "\n";
@@ -344,7 +348,6 @@ namespace {
                     
                 }
 
-                // errs() << "Got here\n";
                 for (auto bb_it = BB.begin(); bb_it != BB.end(); ) {
                     Instruction& I = *bb_it;
                     bb_it++;
@@ -420,7 +423,7 @@ namespace {
                         // actually use this fucking alloca_to_last_value
                         // cast, shift, then or on the result of our previous op
                         auto& val = alloca_it->second;
-                        auto opcode = CastInst::getCastOpcode(val, (dyn_cast<IntegerType>(alloca_it->first->getAllocatedType())) ? true : false, Type::getInt64Ty(context_s), true);
+                        auto opcode = CastInst::getCastOpcode(val, false, Type::getInt64Ty(context_s), false);
                         
                         Instruction* cast_instr = CastInst::Create(opcode, val, Type::getInt64Ty(context_s));
                         cast_instr->insertAfter(result);
