@@ -9,6 +9,7 @@
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Analysis/BlockFrequencyInfo.h"
 #include "llvm/Analysis/BranchProbabilityInfo.h"
+#include "llvm/Transforms/Scalar/DCE.h"
 
 #include <limits>
 #include <unordered_map>
@@ -69,6 +70,25 @@ namespace {
             assert(sum == all_allocas.size());
             fixUpCode(F, packed);
             
+            bool changed = true;
+            while (changed) {
+                changed = false;
+                vector<Instruction*> to_delete;
+                for (auto& BB : F) {
+                    for (auto& I : BB) {
+                        if (I.use_empty() && !dyn_cast<StoreInst>(&I) && !dyn_cast<BranchInst>(&I) && !dyn_cast<ReturnInst>(&I) && !dyn_cast<CallInst>(&I)) {
+                            errs() << "DELETING" << I << "\n";
+                            to_delete.push_back(&I);
+                            changed = true;
+                        }
+                    }
+                }
+
+                for (Instruction* victim : to_delete) {
+                    victim->eraseFromParent();
+                }
+            }
+
             return true;
         }
 
@@ -227,8 +247,6 @@ namespace {
             unordered_map<AllocaInst*, SoftwareRegister> new_to_packed;
             for (auto& elt : packed) {
                 auto new_alloca = new AllocaInst(Type::getInt64Ty(context_s), 0, "cursed", elt.first);
-                StoreInst* store = new StoreInst(ConstantInt::get(Type::getInt64Ty(context_s), 0), new_alloca);
-                store->insertAfter(new_alloca);
                 new_to_packed[new_alloca] = elt.second;
                 for (auto& packing : elt.second.bit_ranges) {
                     old_to_new_allocas[packing.first] = new_alloca;
@@ -429,7 +447,8 @@ char AllocaPackPass::ID = 0;
 static RegisterPass<AllocaPackPass> X("AllocaPack", "Alloca Pack Pass");
 
 static void registerStatisticsPass(const PassManagerBuilder &,
-                         legacy::PassManagerBase &PM) {                  
+                         legacy::PassManagerBase &PM) {
+            
     PM.add(new AllocaPackPass());
 }
 static RegisterStandardPasses
