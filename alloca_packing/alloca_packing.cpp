@@ -10,12 +10,14 @@
 #include "llvm/Analysis/BlockFrequencyInfo.h"
 #include "llvm/Analysis/BranchProbabilityInfo.h"
 
+#include <limits>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
 using namespace llvm;
 
+using std::numeric_limits;
 using std::pair;
 using std::unordered_map;
 using std::unordered_set;
@@ -225,6 +227,8 @@ namespace {
             unordered_map<AllocaInst*, SoftwareRegister> new_to_packed;
             for (auto& elt : packed) {
                 auto new_alloca = new AllocaInst(Type::getInt64Ty(context_s), 0, "cursed", elt.first);
+                StoreInst* store = new StoreInst(ConstantInt::get(Type::getInt64Ty(context_s), 0), new_alloca);
+                store->insertAfter(new_alloca);
                 new_to_packed[new_alloca] = elt.second;
                 for (auto& packing : elt.second.bit_ranges) {
                     old_to_new_allocas[packing.first] = new_alloca;
@@ -241,32 +245,57 @@ namespace {
                     AllocaInst* isAlloca = nullptr;
                     if (LoadInst* load = dyn_cast<LoadInst>(&I)) {
                         isAlloca = dyn_cast<AllocaInst>(load->getPointerOperand());
-                        // errs() << *(load->getPointerOperand()) << "\n";
+                    }
+                    if (StoreInst* store = dyn_cast<StoreInst>(&I)) {
+                        isAlloca = dyn_cast<AllocaInst>(store->getPointerOperand());
+                        // at this point, guaranteed to be dealing with our alloca boi
+                        auto it = old_to_new_allocas.find(isAlloca);
+                        if (it != old_to_new_allocas.end() && !new_to_needed.count(it->second)) {
+                            new_to_needed[it->second] = unordered_set<AllocaInst*>();
+                        }
                     }
                     if (!isAlloca) {
                         continue;
                     }
                     // at this point, guaranteed to be dealing with our alloca boi
-                    //errs() << *isAlloca << "\n";
                     auto it = old_to_new_allocas.find(isAlloca);
                     if (it != old_to_new_allocas.end()) {
-                        //errs() << "INSERTING\n" << "\n";
                         new_to_needed[it->second].insert(isAlloca);
                     } 
                 }
-                // errs() << "REACHED: " << new_to_needed.size() << "\n";
+
+                //keep track of last value
+                unordered_map<AllocaInst*, Value*> alloca_to_last_value;
+                unordered_map<AllocaInst*, LoadInst*> new_alloca_to_load;
                 //3.
                 // add loads to the beginning of basic block and extract variables
-
                 //to_load is <new, needed vector>
                 for (auto& to_load : new_to_needed) {
                     Instruction* to_insert = &(BB.getInstList().front());
-                    while (dyn_cast<AllocaInst>(to_insert)) {
-                        to_insert = to_insert->getNextNode();
+                    while(true) {
+                        auto alloca = dyn_cast<AllocaInst>(to_insert);
+                        if (alloca) {
+                            to_insert = to_insert->getNextNode();
+                            continue;
+                        }
+                        auto store_boi = dyn_cast<StoreInst>(to_insert);
+                        if (!store_boi) {
+                            break;
+                        }
+                        if (auto alloca = dyn_cast<AllocaInst>(store_boi->getPointerOperand())) {
+                            if (new_to_packed.find(alloca) != new_to_packed.end()) {
+                                to_insert = to_insert->getNextNode();
+                                continue;
+                            }
+                        }
+                        
+                        break;
                     }
 
                     LoadInst* load = new LoadInst(to_load.first);
                     load->insertBefore(to_insert);
+                    // save this load as the original value to do the final store
+                    new_alloca_to_load[to_load.first] = load;
 
                     auto& bit_ranges = new_to_packed[to_load.first].bit_ranges;
                     //extract each needed
@@ -285,24 +314,109 @@ namespace {
                         // errs() << end << " " << start << "\n";
                         Instruction* and_instr = BinaryOperator::CreateAnd(start == 0 ? load : shr, ConstantInt::get(Type::getInt64Ty(context_s), mask_value));
                         and_instr->insertAfter(start == 0 ? load : shr);
-                        errs() << "And with " << *and_instr << "\n";
+                        errs() << "And with " << *(and_instr) << "\n";
 
-                        // TODO potentially insert convert here as well?
-                        
+                        auto opcode = CastInst::getCastOpcode(and_instr, true, alloca_inst->getAllocatedType(), (dyn_cast<IntegerType>(alloca_inst->getAllocatedType())) ? true : false);
+                        Instruction* cast_instr = CastInst::Create(opcode, and_instr, alloca_inst->getAllocatedType());
+                        cast_instr->insertAfter(and_instr);
+                        errs() << "Cast instr " << *cast_instr << "\n";
+
+                        alloca_to_last_value[alloca_inst] = cast_instr;                        
                     }
                     
                 }
 
-                for (Instruction& I : BB) {
+                // errs() << "Got here\n";
+                for (auto bb_it = BB.begin(); bb_it != BB.end(); ) {
+                    Instruction& I = *bb_it;
+                    bb_it++;
                     AllocaInst* isAlloca = nullptr;
                     if (StoreInst* store = dyn_cast<StoreInst>(&I)) {
                         isAlloca = dyn_cast<AllocaInst>(store->getPointerOperand());
-                        
+                        errs() << "STORE TO REMOVE: " << *store << "\n";
+                        auto it = old_to_new_allocas.find(isAlloca);
+                        if (it == old_to_new_allocas.end()) {
+                            continue;
+                        }
+
+                        alloca_to_last_value[isAlloca] = store->getValueOperand();
+                        store->eraseFromParent();
                     }
                     else if (LoadInst* load = dyn_cast<LoadInst>(&I)) {
                         isAlloca = dyn_cast<AllocaInst>(load->getPointerOperand());
-                        
+
+                        auto it = old_to_new_allocas.find(isAlloca);
+                        if (it == old_to_new_allocas.end()) {
+                            continue;
+                        }
+
+                        for (auto us = load->use_begin(); us != load->use_end(); ++us) {
+                            assert(dyn_cast<Instruction>(us->getUser())->getParent() == &BB);
+                        }
+
+                        load->replaceAllUsesWith(alloca_to_last_value[isAlloca]);
+                        assert(load->use_begin() == load->use_end());
+                        load->eraseFromParent();
                     }
+                }
+
+                //4. Issue final store for-each packed register
+                for (auto& to_store : new_to_needed) {
+                    //to_store.first is the new alloca
+                    // start with all 1's
+                    uint64_t and_mask = numeric_limits<uint64_t>::max();
+                    bool used_in_bb = false;
+                    for (auto& packed : new_to_packed[to_store.first].bit_ranges) {
+                        if (alloca_to_last_value.find(packed.first) == alloca_to_last_value.end()) {
+                            //this specific packed value in this register hasn't been used in this BB
+                            continue;
+                        }
+                        used_in_bb = true;
+                        //zero out in and_mask the bit range
+                        // if number is 1111 1111 1111, we could subtract out 1111 0000
+                        uint64_t num_to_subtract = -1 + (1L << (packed.second.second - packed.second.first));
+                        num_to_subtract <<= packed.second.first;
+                        and_mask -= num_to_subtract;
+
+                        // errs() << "BITS: " << packed.second.first << " " << packed.second.second << "\n";
+                    }
+                    //if and_mask is still all 1's, then there was no use
+                    if (!used_in_bb) {
+                        continue;
+                    }
+
+                    // and the original load with this and_mask (keeps all the bits except the values used in the BB)
+
+                    assert(new_alloca_to_load.find(to_store.first) != new_alloca_to_load.end());
+                    Instruction* and_instr = BinaryOperator::CreateAnd(new_alloca_to_load[to_store.first], ConstantInt::get(Type::getInt64Ty(context_s), and_mask));
+                    and_instr->insertBefore(BB.getTerminator());
+
+                    auto result = and_instr;
+                    for (auto& packed : new_to_packed[to_store.first].bit_ranges) {
+                        auto alloca_it = alloca_to_last_value.find(packed.first);
+                        if (alloca_it == alloca_to_last_value.end()) {
+                            //this specific packed value in this register hasn't been used in this BB
+                            continue;
+                        }
+
+                        // actually use this fucking alloca_to_last_value
+                        // cast, shift, then or on the result of our previous op
+                        auto& val = alloca_it->second;
+                        auto opcode = CastInst::getCastOpcode(val, (dyn_cast<IntegerType>(alloca_it->first->getAllocatedType())) ? true : false, Type::getInt64Ty(context_s), true);
+                        
+                        Instruction* cast_instr = CastInst::Create(opcode, val, Type::getInt64Ty(context_s));
+                        cast_instr->insertAfter(result);
+                        
+                        Instruction* shl = BinaryOperator::CreateShl(cast_instr, ConstantInt::get(Type::getInt64Ty(context_s), packed.second.first));
+                        shl->insertAfter(cast_instr);
+
+                        Instruction* or_inst = BinaryOperator::CreateOr(shl, result);
+                        or_inst->insertAfter(shl);
+                        result = or_inst;
+                    }
+                    //store result
+                    StoreInst* store = new StoreInst(result, to_store.first);
+                    store->insertAfter(result);
                 }
             }
             

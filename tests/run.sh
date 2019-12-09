@@ -16,4 +16,4 @@ BENCH=../src/test1.c
 clang -emit-llvm -c ${BENCH} -o test1.bc
 
 # Apply your pass to bitcode (IR)
-opt -load ${PATH_MYPASS} ${NAME_MYPASS} -disable-output < test1.bc
+opt -load ${PATH_MYPASS} ${NAME_MYPASS} < test1.bc > new_test.bc
