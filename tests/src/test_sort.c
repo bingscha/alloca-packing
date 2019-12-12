@@ -1,3 +1,9 @@
+#include <stdlib.h>
+#include <stdio.h>
+
+#define SIZE 10000000
+int arr[SIZE];
+
 void quick_sort(int *array, int low, int high)
 {
     int i = low;
@@ -26,21 +32,6 @@ void quick_sort(int *array, int low, int high)
         quick_sort(array, i, high);
 }
 
-void merge_sort(int a[], int length) {
-    merge_sort(a, 0, length-1);
-}
-
-void merge_sort(int a[], int low, int high) {
-    if (low >= high)                  //Base case: 1 value to sort->sorted
-      return;                         //(0 possible only on initial call)
-    else {
-      int mid = (low + high)/2;       //Approximate midpoint*
-      merge_sort(a, low, mid);        //Sort low to mid part of array
-      merge_sort(a, mid+1, high);     //Sort mid+1 to high part of array
-      merge(a, low, mid, mid+1,high); //Merge sorted subparts of array
-    }
-}
-
 void merge(int a[], int left_low, int left_high, int right_low, int right_high) 
 { 
     int length = right_high-left_low+1;
@@ -60,6 +51,21 @@ void merge(int a[], int left_low, int left_high, int right_low, int right_high)
     
     for (int i=0; i< length; ++i) 
         a[left_low++] = temp[i];
+}
+
+void merge_sort_helper(int a[], int low, int high) {
+    if (low >= high)                  //Base case: 1 value to sort->sorted
+      return;                         //(0 possible only on initial call)
+    else {
+      int mid = (low + high)/2;       //Approximate midpoint*
+      merge_sort_helper(a, low, mid);        //Sort low to mid part of array
+      merge_sort_helper(a, mid+1, high);     //Sort mid+1 to high part of array
+      merge(a, low, mid, mid+1,high); //Merge sorted subparts of array
+    }
+}
+
+void merge_sort(int a[], int length) {
+    merge_sort_helper(a, 0, length-1);
 }
 
 void max_heapify(int a[], int i, int n)
@@ -116,5 +122,35 @@ void insertion_sort(int arr[], int length) {
 }
 
 int main() {
-    // todo
+    srand(0);
+
+    for (int i = 0; i < SIZE; ++i) {
+        arr[i] = (int) (rand() * SIZE);
+    }
+
+    quick_sort(arr, 0, SIZE - 1);
+    for (int i = 0; i < SIZE; ++i) {
+      printf("%d ", arr[i]);
+    }
+    printf("\n");
+
+
+    for (int i = 0; i < SIZE; ++i) {
+        arr[i] = (int) (rand() * SIZE);
+    }
+
+    merge_sort(arr, SIZE);
+    for (int i = 0; i < SIZE; ++i) {
+      printf("%d ", arr[i]);
+    }
+    printf("\n");
+    
+    for (int i = 0; i < SIZE; ++i) {
+        arr[i] = (int) (rand() * SIZE);
+    }
+    insertion_sort(arr, SIZE - 1);
+    for (int i = 0; i < SIZE; ++i) {
+      printf("%d ", arr[i]);
+    }
+    printf("\n");
 }

@@ -40,6 +40,7 @@ namespace {
         }
 
         virtual bool runOnFunction(Function &F) {
+            errs() << "Starting " << F.getName() << "\n";
             vector<AllocaInst*> all_allocas;
             unordered_map<AllocaInst*, unordered_map<AllocaInst*, int>> alloca_to_score;
             findAlloca(F, all_allocas);
@@ -51,8 +52,9 @@ namespace {
             //         errs() << "\t" << *(val.first) << " " << val.second <<  "\n";
             //     }
             // }
-
+            errs() << alloca_to_score.size() << "\n";
             unordered_map<AllocaInst*, SoftwareRegister> packed = packAlloca(F, all_allocas, alloca_to_score);
+            errs() << "Finished packing\n";
             int sum = 0;
             for (auto it = packed.begin(); it != packed.end(); ) {
                 int num = it->second.bit_ranges.size();
@@ -88,7 +90,7 @@ namespace {
                     victim->eraseFromParent();
                 }
             }
-
+            errs() << "Finished function " << F.getName() << "\n";
             return true;
         }
 
@@ -156,6 +158,8 @@ namespace {
             }
             
             while (alloca_to_score.size()) {
+                // errs() << alloca_to_score.size() << "\n";
+                errs() << alloca_to_score.begin()->second.size() << "\n";
                 auto largest = getLargestScore(alloca_to_score);
                 
                 // Add this alloca to the prev
@@ -211,6 +215,18 @@ namespace {
                 if (alloca_to_score[largest.first].empty()) {
                     alloca_to_score.erase(largest.first);
                 }
+                
+                vector<AllocaInst*> victim;
+                for (auto& temp : alloca_to_score) {
+                    if (temp.second.empty()) {
+                        victim.push_back(temp.first);
+                    }
+                }
+
+                for (auto& alloca : victim) {
+                    alloca_to_score.erase(alloca);
+                }
+                
             }
 
             for (auto& temp : packed_registers) {
