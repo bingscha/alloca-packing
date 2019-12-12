@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#define SIZE 10000000
+#define SIZE 100000
 int arr[SIZE];
 
 void quick_sort(int *array, int low, int high)
@@ -139,7 +139,7 @@ int main() {
         arr[i] = (int) (rand() * SIZE);
     }
 
-    merge_sort(arr, SIZE);
+    merge_sort(arr, SIZE - 1);
     for (int i = 0; i < SIZE; ++i) {
       printf("%d ", arr[i]);
     }
