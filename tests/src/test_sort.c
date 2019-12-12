@@ -68,43 +68,36 @@ void merge_sort(int a[], int length) {
     merge_sort_helper(a, 0, length-1);
 }
 
-void max_heapify(int a[], int i, int n)
-{
-  int l,r,largest,loc;
-  l=2*i;
-  r=(2*i+1);
-  if((l<=n)&&a[l]>a[i])
-    largest=l;
-  else
-    largest=i;
-  if((r<=n)&&(a[r]>a[largest]))
-    largest=r;
-  if(largest!=i)
-    {
-      loc=a[i];
-      a[i]=a[largest];
-      a[largest]=loc;
-      max_heapify(a, largest,n);
+void heapify(int *unsorted, int index, int heap_size) {
+    int temp;
+    int largest = index;
+    int left_index = 2 * index;
+    int right_index = 2 * index + 1;
+    if (left_index < heap_size && *(unsorted + left_index) > *(unsorted + largest)) {
+        largest = left_index;
     }
-}
-void build_max_heap(int a[], int n)
-{
-  for(int k = n/2; k >= 1; k--)
-    {
-      max_heapify(a, k, n);
+    if (right_index < heap_size && *(unsorted + right_index) > *(unsorted + largest)) {
+        largest = right_index;
     }
-}
-void heap_sort(int a[], int n)
-{
 
-  build_max_heap(a,n);
-  int i, temp;
-  for (i = n; i >= 2; i--)
-    {
-      temp = a[i];
-      a[i] = a[1];
-      a[1] = temp;
-      max_heapify(a, 1, i - 1);
+    if (largest != index) {
+        temp = *(unsorted + largest);
+        *(unsorted + largest) = *(unsorted + index);
+        *(unsorted + index) = temp;
+        heapify(unsorted, largest, heap_size);
+    }
+}
+
+void heap_sort(int *unsorted, int n) {
+    int temp;
+    for (int i = n / 2 - 1; i > -1; i--) {
+        heapify(unsorted, i, n);
+    }
+    for (int i = n - 1; i > 0; i--) {
+        temp = *(unsorted);
+        *(unsorted) = *(unsorted + i);
+        *(unsorted + i) = temp;
+        heapify(unsorted, 0, i);
     }
 }
 
