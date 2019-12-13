@@ -4,7 +4,6 @@
 #define NUM_VERTEX 10000
 
 struct Vertex {
-	char name;
 	int mark;
 	struct Node* list;
 };
@@ -18,9 +17,8 @@ typedef struct Vertex Vertex;
 typedef struct Node Node;
 
 // creates a new vertex and return pointer to it
-Vertex* new_vertex(char name) {
+Vertex* new_vertex() {
 	Vertex* vertex = (Vertex*)malloc(sizeof(Vertex));
-	vertex->name = name;
 	vertex->list = 0;
 	return vertex;
 }
@@ -42,7 +40,7 @@ void connect(Vertex* a, Vertex* b) {
 
 // visit function
 void visit(Vertex* vertex) {
-	printf ("\n%5d. %c", vertex->mark, vertex->name);
+	printf ("\n%5d.", vertex->mark);
 }
 
 // breadth first search
