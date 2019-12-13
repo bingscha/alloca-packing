@@ -6,7 +6,7 @@
 #include <stdbool.h>
 // Number of vertices in the graph
 #define V 10000
-
+int graph[V][V];
 // A utility function to find the vertex with
 // minimum key value, from the set of vertices
 // not yet included in MST
@@ -91,7 +91,7 @@ int main()
 	| /	 \ |
 	(3)-------(4)
 			9		 */
-int graph[V][V];
+
 	srand(0);
 	for (int i = 0; i < V; ++i) {
 		graph[i][i] = 0;
