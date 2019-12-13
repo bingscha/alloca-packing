@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#define SIZE 5000000
+#define SIZE 100000
 int arr[SIZE];
 
 void merge(int a[], int left_low, int left_high, int right_low, int right_high) 

@@ -5,7 +5,7 @@
 #include <limits.h>
 #include <stdbool.h>
 // Number of vertices in the graph
-#define V 1000
+#define V 10000
 
 // A utility function to find the vertex with
 // minimum key value, from the set of vertices
