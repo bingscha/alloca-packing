@@ -5,7 +5,7 @@
 #include <limits.h>
 #include <stdbool.h>
 // Number of vertices in the graph
-#define V 5
+#define V 1000
 
 // A utility function to find the vertex with
 // minimum key value, from the set of vertices
@@ -91,11 +91,22 @@ int main()
 	| /	 \ |
 	(3)-------(4)
 			9		 */
-int graph[V][V] = {{0, 2, 0, 6, 0},
-					{2, 0, 3, 8, 5},
-					{0, 3, 0, 0, 7},
-					{6, 8, 0, 0, 9},
-					{0, 5, 7, 9, 0}};
+int graph[V][V];
+	srand(0);
+	for (int i = 0; i < V; ++i) {
+		graph[i][i] = 0;
+		for (int j = i + 1; j < V; ++j) {
+			if (rand() > 0.5) {
+				int temp = rand() * 100;
+				graph[i][j] = temp;
+				graph[j][i] = temp;
+			}
+			else {
+				graph[i][j] = 0;
+				graph[j][i] = 0;
+			}
+		}
+	}
 
 	// Print the solution
 	primMST(graph);
