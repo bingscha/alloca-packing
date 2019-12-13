@@ -2,6 +2,7 @@
 // Spanning Tree (MST) algorithm. The program is
 // for adjacency matrix representation of the graph
 #include <stdio.h>
+#include <stdlib.h>
 #include <limits.h>
 #include <stdbool.h>
 // Number of vertices in the graph

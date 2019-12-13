@@ -39,22 +39,43 @@ namespace {
             AU.setPreservesAll();
         }
 
+        void printFunctionStats(Function& F) {
+            int numLoads = 0, numInstructions = 0, numStores = 0, numAllocas = 0, numBinaryOperators = 0;
+
+            for (auto& BB : F) {
+                for (auto& I : BB) {
+                    ++numInstructions;
+
+                    if (dyn_cast<StoreInst>(&I)) {
+                        ++numStores;
+                    }
+                    else if (dyn_cast<LoadInst>(&I)) {
+                        ++numLoads;
+                    }
+                    else if (dyn_cast<AllocaInst>(&I)) {
+                        ++numAllocas;
+                    }
+                    else if (dyn_cast<BinaryOperator>(&I)) {
+                        ++numBinaryOperators;
+                    }
+                    else if (dyn_cast<UnaryInstruction>(&I)) {
+                        ++numBinaryOperators;
+                    }
+                }
+            } 
+
+            errs() << F.getName() << " "  << numInstructions << " " << numLoads << " " << numStores << " " << numAllocas << " " << numBinaryOperators << "\n";
+        }
+
         virtual bool runOnFunction(Function &F) {
-            errs() << "Starting " << F.getName() << "\n";
+            printFunctionStats(F);
+
             vector<AllocaInst*> all_allocas;
             unordered_map<AllocaInst*, unordered_map<AllocaInst*, int>> alloca_to_score;
             findAlloca(F, all_allocas);
             alloca_to_score = getSimilarUses(F, all_allocas);
 
-            // for (auto& temp : alloca_to_score) {
-            //     errs() << *(temp.first) << "\n";
-            //     for (auto& val : temp.second) {
-            //         errs() << "\t" << *(val.first) << " " << val.second <<  "\n";
-            //     }
-            // }
-            errs() << alloca_to_score.size() << "\n";
             unordered_map<AllocaInst*, SoftwareRegister> packed = packAlloca(F, all_allocas, alloca_to_score);
-            errs() << "Finished packing\n";
             int sum = 0;
             for (auto it = packed.begin(); it != packed.end(); ) {
                 int num = it->second.bit_ranges.size();
@@ -79,7 +100,6 @@ namespace {
                 for (auto& BB : F) {
                     for (auto& I : BB) {
                         if (I.use_empty() && !dyn_cast<StoreInst>(&I) && !dyn_cast<BranchInst>(&I) && !dyn_cast<ReturnInst>(&I) && !dyn_cast<CallInst>(&I)) {
-                            errs() << "DELETING" << I << "\n";
                             to_delete.push_back(&I);
                             changed = true;
                         }
@@ -90,7 +110,7 @@ namespace {
                     victim->eraseFromParent();
                 }
             }
-            errs() << "Finished function " << F.getName() << "\n";
+            printFunctionStats(F);
             return true;
         }
 
@@ -158,8 +178,6 @@ namespace {
             }
             
             while (alloca_to_score.size()) {
-                // errs() << alloca_to_score.size() << "\n";
-                errs() << alloca_to_score.begin()->second.size() << "\n";
                 auto largest = getLargestScore(alloca_to_score);
                 
                 // Add this alloca to the prev
@@ -170,7 +188,6 @@ namespace {
                     curr_size += alloc_size;
                 }
 
-                //errs() << "combining\n" << *(largest.first) << "\n" << *(largest.second) << "\n" << packed_registers[largest.first].size << "\n";
                 assert(packed_registers[largest.first].size <= 64);
                 packed_registers.erase(largest.second);
 
@@ -226,14 +243,7 @@ namespace {
                 for (auto& alloca : victim) {
                     alloca_to_score.erase(alloca);
                 }
-                
-            }
 
-            for (auto& temp : packed_registers) {
-                errs() << *(temp.first) << " " << temp.second.size << "\n";
-                for (auto& val : temp.second.bit_ranges) {
-                    errs() << "\t" << *(val.first) << " "  << val.second.first << " " << val.second.second << "\n";
-                }
             }
 
             return packed_registers;
@@ -268,7 +278,7 @@ namespace {
                     old_to_new_allocas[packing.first] = new_alloca;
                 }
             }
-
+            unordered_set<AllocaInst*> stores_needed;
             // 2.
             // Iterate through each BB and load our new variable if necessary
             for (auto& BB : F) {
@@ -295,6 +305,7 @@ namespace {
                         if (it != old_to_new_allocas.end()) {
                             // used.insert(isAlloca);
                             if (!new_to_needed.count(it->second)) {
+                                stores_needed.insert(old_to_new_allocas[isAlloca]);
                                 new_to_needed[it->second] = unordered_set<AllocaInst*>();
                             }
                         }
@@ -305,6 +316,7 @@ namespace {
                 //keep track of last value
                 unordered_map<AllocaInst*, Value*> alloca_to_last_value;
                 unordered_map<AllocaInst*, LoadInst*> new_alloca_to_load;
+                unordered_map<AllocaInst*, bool> alloca_is_stored;
                 //3.
                 // add loads to the beginning of basic block and extract variables
                 //to_load is <new, needed vector>
@@ -345,21 +357,18 @@ namespace {
                         if (start != 0) {
                             shr = BinaryOperator::CreateAShr(load, ConstantInt::get(Type::getInt64Ty(context_s), start));
                             shr->insertAfter(load);
-
-                            errs() << "Shift RIGHT" << *shr << "\n";
                         }
                         int64_t mask_value = -1 + (1L << (end  - start));
-                        // errs() << end << " " << start << "\n";
+
                         Instruction* and_instr = BinaryOperator::CreateAnd(start == 0 ? load : shr, ConstantInt::get(Type::getInt64Ty(context_s), mask_value));
                         and_instr->insertAfter(start == 0 ? load : shr);
-                        errs() << "And with " << *(and_instr) << "\n";
 
                         auto opcode = CastInst::getCastOpcode(and_instr, false, alloca_inst->getAllocatedType(), false);
                         Instruction* cast_instr = CastInst::Create(opcode, and_instr, alloca_inst->getAllocatedType());
                         cast_instr->insertAfter(and_instr);
-                        errs() << "Cast instr " << *cast_instr << "\n";
 
-                        alloca_to_last_value[alloca_inst] = cast_instr;                        
+                        alloca_to_last_value[alloca_inst] = cast_instr;
+                        alloca_is_stored[alloca_inst] = false;                        
                     }
                     
                 }
@@ -370,13 +379,13 @@ namespace {
                     AllocaInst* isAlloca = nullptr;
                     if (StoreInst* store = dyn_cast<StoreInst>(&I)) {
                         isAlloca = dyn_cast<AllocaInst>(store->getPointerOperand());
-                        errs() << "STORE TO REMOVE: " << *store << "\n";
                         auto it = old_to_new_allocas.find(isAlloca);
                         if (it == old_to_new_allocas.end()) {
                             continue;
                         }
 
                         alloca_to_last_value[isAlloca] = store->getValueOperand();
+                        alloca_is_stored[isAlloca] = true;
                         store->eraseFromParent();
                     }
                     else if (LoadInst* load = dyn_cast<LoadInst>(&I)) {
@@ -396,7 +405,7 @@ namespace {
                         load->eraseFromParent();
                     }
                 }
-
+                // int count = 0;
                 //4. Issue final store for-each packed register
                 for (auto& to_store : new_to_needed) {
                     //to_store.first is the new alloca
@@ -404,7 +413,7 @@ namespace {
                     uint64_t and_mask = numeric_limits<uint64_t>::max();
                     bool used_in_bb = false;
                     for (auto& packed : new_to_packed[to_store.first].bit_ranges) {
-                        if (alloca_to_last_value.find(packed.first) == alloca_to_last_value.end()) {
+                        if (alloca_to_last_value.find(packed.first) == alloca_to_last_value.end() || !alloca_is_stored[packed.first]) {
                             //this specific packed value in this register hasn't been used in this BB
                             continue;
                         }
@@ -414,8 +423,6 @@ namespace {
                         uint64_t num_to_subtract = -1 + (1L << (packed.second.second - packed.second.first));
                         num_to_subtract <<= packed.second.first;
                         and_mask -= num_to_subtract;
-
-                        // errs() << "BITS: " << packed.second.first << " " << packed.second.second << "\n";
                     }
                     //if and_mask is still all 1's, then there was no use
                     if (!used_in_bb) {
@@ -453,8 +460,11 @@ namespace {
                     }
                     //store result
                     StoreInst* store = new StoreInst(result, to_store.first);
+                    // errs() << *store << "\n";
                     store->insertAfter(result);
                 }
+                // errs() << stores_needed.size() << " " << count << "\n";
+                // assert(count == stores_needed.size());
             }
             
         }

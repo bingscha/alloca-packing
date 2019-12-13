@@ -1,10 +1,9 @@
-#include <assert.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 
 #include "hashtable.h"
-#define SIZE 10000
+#define SIZE 1000000
 int x[SIZE];
 double y[SIZE];
 
@@ -12,7 +11,6 @@ int ht_setup(HashTable* table,
 						 size_t key_size,
 						 size_t value_size,
 						 size_t capacity) {
-	assert(table != NULL);
 
 	if (table == NULL) return HT_ERROR;
 
@@ -36,9 +34,6 @@ int ht_setup(HashTable* table,
 int ht_copy(HashTable* first, HashTable* second) {
 	size_t chain;
 	HTNode* node;
-
-	assert(first != NULL);
-	assert(ht_is_initialized(second));
 
 	if (first == NULL) return HT_ERROR;
 	if (!ht_is_initialized(second)) return HT_ERROR;
@@ -65,8 +60,6 @@ int ht_copy(HashTable* first, HashTable* second) {
 }
 
 int ht_move(HashTable* first, HashTable* second) {
-	assert(first != NULL);
-	assert(ht_is_initialized(second));
 
 	if (first == NULL) return HT_ERROR;
 	if (!ht_is_initialized(second)) return HT_ERROR;
@@ -78,8 +71,6 @@ int ht_move(HashTable* first, HashTable* second) {
 }
 
 int ht_swap(HashTable* first, HashTable* second) {
-	assert(ht_is_initialized(first));
-	assert(ht_is_initialized(second));
 
 	if (!ht_is_initialized(first)) return HT_ERROR;
 	if (!ht_is_initialized(second)) return HT_ERROR;
@@ -99,7 +90,6 @@ int ht_destroy(HashTable* table) {
 	HTNode* next;
 	size_t chain;
 
-	assert(ht_is_initialized(table));
 	if (!ht_is_initialized(table)) return HT_ERROR;
 
 	for (chain = 0; chain < table->capacity; ++chain) {
@@ -119,9 +109,6 @@ int ht_destroy(HashTable* table) {
 int ht_insert(HashTable* table, void* key, void* value) {
 	size_t index;
 	HTNode* node;
-
-	assert(ht_is_initialized(table));
-	assert(key != NULL);
 
 	if (!ht_is_initialized(table)) return HT_ERROR;
 	if (key == NULL) return HT_ERROR;
@@ -151,9 +138,6 @@ int ht_contains(HashTable* table, void* key) {
 	size_t index;
 	HTNode* node;
 
-	assert(ht_is_initialized(table));
-	assert(key != NULL);
-
 	if (!ht_is_initialized(table)) return HT_ERROR;
 	if (key == NULL) return HT_ERROR;
 
@@ -170,9 +154,6 @@ int ht_contains(HashTable* table, void* key) {
 void* ht_lookup(HashTable* table, void* key) {
 	HTNode* node;
 	size_t index;
-
-	assert(table != NULL);
-	assert(key != NULL);
 
 	if (table == NULL) return NULL;
 	if (key == NULL) return NULL;
@@ -191,9 +172,6 @@ const void* ht_const_lookup(const HashTable* table, void* key) {
 	const HTNode* node;
 	size_t index;
 
-	assert(table != NULL);
-	assert(key != NULL);
-
 	if (table == NULL) return NULL;
 	if (key == NULL) return NULL;
 
@@ -211,9 +189,6 @@ int ht_erase(HashTable* table, void* key) {
 	HTNode* node;
 	HTNode* previous;
 	size_t index;
-
-	assert(table != NULL);
-	assert(key != NULL);
 
 	if (table == NULL) return HT_ERROR;
 	if (key == NULL) return HT_ERROR;
@@ -246,8 +221,6 @@ int ht_erase(HashTable* table, void* key) {
 }
 
 int ht_clear(HashTable* table) {
-	assert(table != NULL);
-	assert(table->nodes != NULL);
 
 	if (table == NULL) return HT_ERROR;
 	if (table->nodes == NULL) return HT_ERROR;
@@ -260,7 +233,6 @@ int ht_clear(HashTable* table) {
 }
 
 int ht_is_empty(HashTable* table) {
-	assert(table != NULL);
 	if (table == NULL) return HT_ERROR;
 	return table->size == 0;
 }
@@ -270,7 +242,6 @@ bool ht_is_initialized(HashTable* table) {
 }
 
 int ht_reserve(HashTable* table, size_t minimum_capacity) {
-	assert(ht_is_initialized(table));
 	if (!ht_is_initialized(table)) return HT_ERROR;
 
 	/*
@@ -330,22 +301,16 @@ bool _ht_equal(const HashTable* table, void* first_key, void* second_key) {
 }
 
 bool _ht_should_grow(HashTable* table) {
-	assert(table->size <= table->capacity);
 	return table->size == table->capacity;
 }
 
 bool _ht_should_shrink(HashTable* table) {
-	assert(table->size <= table->capacity);
 	return table->size == table->capacity * HT_SHRINK_THRESHOLD;
 }
 
 HTNode*
 _ht_create_node(HashTable* table, void* key, void* value, HTNode* next) {
 	HTNode* node;
-
-	assert(table != NULL);
-	assert(key != NULL);
-	assert(value != NULL);
 
 	if ((node = malloc(sizeof *node)) == NULL) {
 		return NULL;
@@ -370,8 +335,6 @@ int _ht_push_front(HashTable* table, size_t index, void* key, void* value) {
 }
 
 void _ht_destroy_node(HTNode* node) {
-	assert(node != NULL);
-
 	free(node->key);
 	free(node->value);
 	free(node);
