@@ -38,7 +38,7 @@ int main() {
     for (int i = 0; i < SIZE; ++i) {
         arr[i] = (int) (rand() * SIZE);
     }
-    quick_sort(arr, SIZE - 1);
+    quick_sort(arr, 0, SIZE - 1);
     for (int i = 0; i < SIZE; ++i) {
       printf("%d ", arr[i]);
     }
