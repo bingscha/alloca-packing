@@ -1,3 +1,5 @@
+#include <stdlib.h>
+
 #define NUM_VERTEX 10
 
 struct Vertex {
