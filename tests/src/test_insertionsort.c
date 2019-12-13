@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#define SIZE 10000000
+#define SIZE 100000
 int arr[SIZE];
 
 void insertion_sort(int arr[], int length) {

@@ -1,7 +1,9 @@
-#define NUM_VERTEX 10
+#include <stdlib.h>
+#include <stdio.h>
+
+#define NUM_VERTEX 10000
 
 struct Vertex {
-	char name;
 	int mark;
 	struct Node* list;
 };
@@ -15,9 +17,8 @@ typedef struct Vertex Vertex;
 typedef struct Node Node;
 
 // creates a new vertex and return pointer to it
-Vertex* new_vertex(char name) {
+Vertex* new_vertex() {
 	Vertex* vertex = (Vertex*)malloc(sizeof(Vertex));
-	vertex->name = name;
 	vertex->list = 0;
 	return vertex;
 }
@@ -39,7 +40,7 @@ void connect(Vertex* a, Vertex* b) {
 
 // visit function
 void visit(Vertex* vertex) {
-	printf ("\n%5d. %c", vertex->mark, vertex->name);
+	printf ("\n%5d.", vertex->mark);
 }
 
 // breadth first search
@@ -101,33 +102,21 @@ void bfs(Vertex *graph[]) {
 // main function - their example, should replace with random graph
 int main() {
 	
+	srand(0);
 	// create a adjacency list
-	Vertex *graph[NUM_VERTEX] = {
-		new_vertex('A'), //[0]
-		new_vertex('B'), //[1]
-		new_vertex('C'), //[2]
-		new_vertex('D'), //[3]
-		new_vertex('E'), //[4]
-		new_vertex('F'), //[5]
-		new_vertex('G'), //[6]
-		new_vertex('H'), //[7]
-		new_vertex('I'), //[8]
-		new_vertex('J')  //[9]
-	};
-	
-	// connect the vertices
-	connect(graph[0], graph[2]);
-	connect(graph[0], graph[3]);
-	connect(graph[0], graph[4]);
-	connect(graph[1], graph[4]);
-	connect(graph[1], graph[5]);
-	connect(graph[2], graph[3]);
-	connect(graph[2], graph[5]);
-	connect(graph[4], graph[5]);
-	connect(graph[6], graph[7]);
-	connect(graph[6], graph[9]);
-	connect(graph[7], graph[8]);
-	connect(graph[8], graph[9]);
+	Vertex *graph[NUM_VERTEX];
+
+	for (int i = 0; i < NUM_VERTEX; ++i) {
+		graph[i] = new_vertex();
+	}
+
+	for (int i = 0; i < NUM_VERTEX; ++i) {
+		for (int j = i + 1; j < NUM_VERTEX; ++j) {
+			if (rand() > 0.5) {
+				connect(graph[i], graph[j]);
+			}
+		}
+	}
 	
 	printf ("BFS: ");
 	bfs (graph);
