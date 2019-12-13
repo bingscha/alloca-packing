@@ -24,7 +24,7 @@ return min_index;
 
 // A utility function to print the
 // constructed MST stored in parent[]
-int printMST(int parent[], int n, int graph[V][V])
+void printMST(int parent[], int n, int graph[V][V])
 {
 printf("Edge \tWeight\n");
 for (int i = 1; i < V; i++)
