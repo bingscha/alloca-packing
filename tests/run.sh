@@ -11,26 +11,29 @@ NAME_MYPASS=-AllocaPack                                                       ##
 #BENCH=../src/test1.c
 # BENCH=../src/test_sort.c
 
+echo "" > logs.txt
 
 for file in ../src/*.c; do 
     if [ -f "$file" ]; then 
+        echo "$file" >> logs.txt 
         # Convert source code to bitcode (IR)
         # This approach has an issue with -O2, so we are going to stick with default optimization level (-O0)
         clang -emit-llvm -c $file -o test1.bc
 
         # Apply your pass to bitcode (IR)
-        opt -load ${PATH_MYPASS} ${NAME_MYPASS} < test1.bc > new_test.bc 2> logs.txt
+        opt -load ${PATH_MYPASS} ${NAME_MYPASS} < test1.bc > new_test.bc 2>> logs.txt
 
-        clang -O2 test1.bc -o test1
-        clang -O2 new_test.bc -o new_test
-        echo ""
-        echo "Benchmarking $file"
-        echo ""
-        echo "Baseline"
-        time ./test1 > out
-        echo ""
-        echo "Optimized"
-        time ./new_test > out_other
+        clang -O2 test1.bc -pg -o test1
+        clang -O2 new_test.bc -pg -o new_test
+        echo "" >> logs.txt
+        echo "Benchmarking $file" >> logs.txt
+        echo "" >> logs.txt
+        echo "Baseline" >> logs.txt
+        (time ./test1 > out) 2>> logs.txt
+        echo "" >> logs.txt
+        echo "Optimized" >> logs.txt
+        (time ./new_test > out_other) 2>> logs.txt
+        echo "" >> logs.txt
 
         diff out out_other
     fi 
