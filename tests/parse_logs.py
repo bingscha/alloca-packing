@@ -8,11 +8,16 @@ i = 0
 lines = [val.strip() for val in lines]
 lines = [val for val in lines if val]
 
+avg = int(lines[i])
+i += 1
+
 while i < len(lines):
-    file_information[lines[i]] = []
-    file_name = lines[i]
-    file_information[file_name].append({'inst_count': 0,'loads': 0, 'stores': 0, 'allocas': 0, 'binary_and_unary': 0})
-    file_information[file_name].append({'inst_count': 0,'loads': 0, 'stores': 0, 'allocas': 0, 'binary_and_unary': 0})
+    file_name = lines[i].split('/')[-1]
+    if file_name not in file_information:
+        file_information[file_name] = []
+        file_information[file_name].append({'inst_count': 0,'loads': 0, 'stores': 0, 'allocas': 0, 'binary_and_unary': 0, 'time': 0.0})
+        file_information[file_name].append({'inst_count': 0,'loads': 0, 'stores': 0, 'allocas': 0, 'binary_and_unary': 0, 'time': 0.0})
+
     i += 1
     while lines[i].split()[0] != 'Benchmarking':
         stats = lines[i].split()
@@ -34,12 +39,12 @@ while i < len(lines):
     i += 2
 
     stats = lines[i].split()
-    file_information[file_name][0]['time'] = float(stats[1].split('m')[1].rstrip('s'))
+    file_information[file_name][0]['time'] += float(stats[1].split('m')[1].rstrip('s'))
 
     i += 4
 
     stats = lines[i].split()
-    file_information[file_name][1]['time'] = float(stats[1].split('m')[1].rstrip('s'))
+    file_information[file_name][1]['time'] += float(stats[1].split('m')[1].rstrip('s'))
 
     i += 3
 
