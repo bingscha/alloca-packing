@@ -48,4 +48,9 @@ while i < len(lines):
 
     i += 3
 
+for key in file_information.keys():
+    for i in range(2):
+        for other_key in file_information[key][i].keys():
+            file_information[key][i][other_key] /= avg
+
 info.write(str(file_information))
