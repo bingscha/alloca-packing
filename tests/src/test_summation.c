@@ -2,9 +2,9 @@
 
 int main() {
     short a = 1, b = 2, c = 3, d = 4;
-    long sum = 0;
+    int sum = 0;
 
-    for (int i = 0; i < 100000000; ++i) {
+    for (long i = 0; i < 100000000; ++i) {
         int to_add = 0;
         to_add += a++;
         to_add += b++;
@@ -13,10 +13,10 @@ int main() {
 
         sum += to_add;
 
-        sum *= a;
-        sum *= b;
-        sum *= c;
-        sum *= d;
+        sum *= a++;
+        sum *= b++;
+        sum *= c++;
+        sum *= d++;
     }
     printf("%ld\n", sum);
 }
