@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 # all metrics available
 metrics = ['inst_count', 'loads', 'stores', 'allocas', 'binary_and_unary', 'time']
 # which metrics to show : how it appears in legend
-display = ['loads', 'stores', 'time', 'inst_count']
+display = ['loads', 'stores', 'time']
 
 labels = [x.replace('_', ' ').capitalize() for x in display]
 
