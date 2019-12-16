@@ -43,62 +43,6 @@ void visit(Vertex* vertex) {
 	printf ("\n%5d.", vertex->mark);
 }
 
-// breadth first search
-void do_bfs(Vertex *vertex, int* count) {
-	Node *initialQueue, *front, *rear, *p, *temp;
-	Vertex *w;
-	// count = count + 1, mark vertex with count
-	vertex->mark = ++(*count);
-	visit (vertex);
-	// initialize a queue, and initialize with vertex.
-	initialQueue = (Node*)malloc(sizeof(Node));
-	initialQueue->vertex = vertex;
-	initialQueue->next = 0;
-	front = initialQueue;
-	rear  = initialQueue;
-	// while queue is not empty
-	while (front != 0) {
-		// for vertyex w in V adjacent to the front vertex
-		p = front->vertex->list;
-		while (p != 0) {
-			w = p->vertex;
-			// if w is marked with 0
-			if (w->mark == 0) {
-				Node* nextQueue;
-				// count = count + 1, mark w with count
-				w->mark = ++(*count);
-				visit (w);
-				// add w to queue
-				nextQueue = (Node*)malloc(sizeof(Node));
-				nextQueue->vertex = w;
-				nextQueue->next = 0;
-				rear->next = nextQueue;
-				rear = nextQueue;
-			}
-			p = p->next;
-		}
-		// remove front vertex from queue
-		temp = front;
-		front = front->next;
-		free (temp);
-	}
-}
-
-void bfs(Vertex *graph[]) {
-	int i;
-	int count = 0;
-	// set all to unvisited
-	for (i = 0; i < NUM_VERTEX; i ++) {
-		graph[i]->mark = 0;
-	}
-	// each vertex bfs it
-	for (i = 0; i < NUM_VERTEX; i ++) {
-		if (graph[i]->mark == 0) {
-			do_bfs (graph[i], &count);
-		}
-	}
-}
-
 // main function - their example, should replace with random graph
 int main() {
 	
@@ -119,5 +63,52 @@ int main() {
 	}
 	
 	printf ("BFS: ");
-	bfs (graph);
+	int i;
+	int count = 0;
+	// set all to unvisited
+	for (i = 0; i < NUM_VERTEX; i ++) {
+		graph[i]->mark = 0;
+	}
+	// each vertex bfs it
+	for (i = 0; i < NUM_VERTEX; i ++) {
+		if (graph[i]->mark == 0) {
+			Node *initialQueue, *front, *rear, *p, *temp;
+		Vertex *w;
+		// count = count + 1, mark vertex with count
+		graph[i]->mark = ++count;
+		visit (graph[i]);
+		// initialize a queue, and initialize with vertex.
+		initialQueue = (Node*)malloc(sizeof(Node));
+		initialQueue->vertex = graph[i];
+		initialQueue->next = 0;
+		front = initialQueue;
+		rear  = initialQueue;
+		// while queue is not empty
+		while (front != 0) {
+			// for vertyex w in V adjacent to the front vertex
+			p = front->vertex->list;
+			while (p != 0) {
+				w = p->vertex;
+				// if w is marked with 0
+				if (w->mark == 0) {
+					Node* nextQueue;
+					// count = count + 1, mark w with count
+					w->mark = ++count;
+					visit (w);
+					// add w to queue
+					nextQueue = (Node*)malloc(sizeof(Node));
+					nextQueue->vertex = w;
+					nextQueue->next = 0;
+					rear->next = nextQueue;
+					rear = nextQueue;
+				}
+				p = p->next;
+			}
+			// remove front vertex from queue
+			temp = front;
+			front = front->next;
+			free (temp);
+		}
+		}
+	}
 }
