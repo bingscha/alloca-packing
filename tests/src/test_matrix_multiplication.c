@@ -18,22 +18,22 @@ int main()
         }
     }  
   
-    int i, j, k; 
-    for (i = 0; i < N; i++) 
+    int x, y, z; 
+    for (x = 0; x < N; x++) 
     { 
-        for (j = 0; j < N; j++) 
+        for (y = 0; y < N; y++) 
         { 
-            res[i][j] = 0; 
-            for (k = 0; k < N; k++) 
-                res[i][j] += mat1[i][k] *  
-                             mat2[k][j]; 
+            res[x][y] = 0; 
+            for (z = 0; z < N; z++) 
+                res[x][y] += mat1[x][z] *  
+                             mat2[z][y]; 
         } 
     } 
 
-    for (i = 0; i < N; i++) 
+    for (x = 0; x < N; x++) 
     { 
-        for (j = 0; j < N; j++) 
-        printf("%d", res[i][j]);
+        for (y = 0; y < N; y++) 
+        printf("%d", res[x][y]);
         printf("\n");
     } 
   

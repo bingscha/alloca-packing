@@ -43,13 +43,6 @@ void visit(Vertex* vertex) {
 	printf ("\n%5d.", vertex->mark);
 }
 
-// breadth first search
-void do_bfs(Vertex *vertex, int* count) {
-}
-
-void bfs(Vertex *graph[]) {
-}
-
 // main function - their example, should replace with random graph
 int main() {
 	
