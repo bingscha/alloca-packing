@@ -4,8 +4,9 @@ import matplotlib.pyplot as plt
 # all metrics available
 metrics = ['inst_count', 'loads', 'stores', 'allocas', 'binary_and_unary', 'time']
 # which metrics to show : how it appears in legend
-display = ['loads', 'stores', 'time', 'allocas']
+display = ['loads', 'stores', 'time', 'inst_count']
 
+labels = [x.replace('_', ' ').capitalize() for x in display]
 
 data = eval(open('parsed.txt').read())
 metrics_percent_change = {}
@@ -20,7 +21,6 @@ for case, val in data.items():
 # test case names
 keys = [x.split('/')[-1][5:-2] for x in data.keys()]
 X = np.arange(len(keys))
-labels = [x.capitalize() for x in display]
 
 fig = plt.figure()
 ax = fig.add_subplot(111)
