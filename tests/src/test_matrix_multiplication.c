@@ -1,13 +1,14 @@
 #include <stdlib.h>
+#include <stdio.h>
 
 #define N 10000 
   
 // This function multiplies  
 // mat1[][] and mat2[][], and  
 // stores the result in res[][] 
-void multiply(int** mat1,  
-              int** mat2,  
-              int** res) 
+void multiply(int mat1[][N], 
+              int mat2[][N],  
+              int res[][N]) 
 { 
     int i, j, k; 
     for (i = 0; i < N; i++) 
@@ -42,7 +43,7 @@ int main()
     { 
         for (j = 0; j < N; j++) 
         printf("%d", res[i][j]);
-        printf("%n");
+        printf("\n");
     } 
   
     return 0; 
