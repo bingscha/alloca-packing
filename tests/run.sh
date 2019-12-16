@@ -12,9 +12,10 @@ NAME_MYPASS=-AllocaPack                                                       ##
 # BENCH=../src/test_sort.c
 COUNT=5
 
-echo "${COUNT}" > logs.txt
+echo "5" > logs.txt
 
-for i in {1..${COUNT}}; do 
+for i in {1..5}; do
+    echo "$i"	
     for file in ../src/*.c; do 
         if [ -f "$file" ]; then 
             echo "$file" >> logs.txt 
