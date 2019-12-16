@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#define N 10000 
+#define N 1000
   
 // This function multiplies  
 // mat1[][] and mat2[][], and  
