@@ -12,6 +12,11 @@ int main() {
         to_add += d++;
 
         sum += to_add;
+
+        sum *= a;
+        sum *= b;
+        sum *= c;
+        sum *= d;
     }
     printf("%ld\n", sum);
 }
