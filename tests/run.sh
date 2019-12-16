@@ -25,8 +25,8 @@ for i in {1..${COUNT}}; do
             # Apply your pass to bitcode (IR)
             opt -load ${PATH_MYPASS} ${NAME_MYPASS} < test1.bc > new_test.bc 2>> logs.txt
 
-            clang -O2 test1.bc -pg -o test1
-            clang -O2 new_test.bc -pg -o new_test
+            clang -O2 test1.bc -o test1
+            clang -O2 new_test.bc -o new_test
             echo "" >> logs.txt
             echo "Benchmarking $file" >> logs.txt
             echo "" >> logs.txt
