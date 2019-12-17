@@ -443,7 +443,7 @@ namespace {
                             continue;
                         }
 
-                        // actually use this fucking alloca_to_last_value
+                        // actually use this alloca_to_last_value
                         // cast, shift, then or on the result of our previous op
                         auto& val = alloca_it->second;
                         auto opcode = CastInst::getCastOpcode(val, false, Type::getInt64Ty(context_s), false);
