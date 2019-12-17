@@ -272,7 +272,7 @@ namespace {
             unordered_map<AllocaInst*, AllocaInst*> old_to_new_allocas;
             unordered_map<AllocaInst*, SoftwareRegister> new_to_packed;
             for (auto& elt : packed) {
-                auto new_alloca = new AllocaInst(Type::getInt64Ty(context_s), 0, "cursed", elt.first);
+                auto new_alloca = new AllocaInst(Type::getInt64Ty(context_s), 0, "packed", elt.first);
                 new_to_packed[new_alloca] = elt.second;
                 for (auto& packing : elt.second.bit_ranges) {
                     old_to_new_allocas[packing.first] = new_alloca;
