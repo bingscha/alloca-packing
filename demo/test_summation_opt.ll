@@ -9,18 +9,18 @@ target triple = "x86_64-unknown-linux-gnu"
 define dso_local i32 @main() #0 {
 entry:
   %retval = alloca i32, align 4
-  %cursed1 = alloca i64
+  %packed1 = alloca i64
   %i = alloca i64, align 8
-  %cursed = alloca i64
-  %0 = load i64, i64* %cursed1
-  %1 = load i64, i64* %cursed
+  %packed = alloca i64
+  %0 = load i64, i64* %packed1
+  %1 = load i64, i64* %packed
   store i32 0, i32* %retval, align 4
   store i64 0, i64* %i, align 8
   %2 = and i64 %1, 4294967295
   %3 = zext i32 0 to i64
   %4 = shl i64 %3, 32
   %5 = or i64 %4, %2
-  store i64 %5, i64* %cursed
+  store i64 %5, i64* %packed
   %6 = and i64 %0, 0
   %7 = zext i16 3 to i64
   %8 = shl i64 %7, 48
@@ -34,7 +34,7 @@ entry:
   %16 = zext i16 1 to i64
   %17 = shl i64 %16, 16
   %18 = or i64 %17, %15
-  store i64 %18, i64* %cursed1
+  store i64 %18, i64* %packed1
   br label %for.cond
 
 for.cond:                                         ; preds = %for.inc, %entry
@@ -43,11 +43,11 @@ for.cond:                                         ; preds = %for.inc, %entry
   br i1 %cmp, label %for.body, label %for.end
 
 for.body:                                         ; preds = %for.cond
-  %20 = load i64, i64* %cursed
+  %20 = load i64, i64* %packed
   %21 = ashr i64 %20, 32
   %22 = and i64 %21, 4294967295
   %23 = trunc i64 %22 to i32
-  %24 = load i64, i64* %cursed1
+  %24 = load i64, i64* %packed1
   %25 = ashr i64 %24, 32
   %26 = and i64 %25, 65535
   %27 = trunc i64 %26 to i16
@@ -97,7 +97,7 @@ for.body:                                         ; preds = %for.cond
   %46 = zext i16 %inc11 to i64
   %47 = shl i64 %46, 16
   %48 = or i64 %47, %45
-  store i64 %48, i64* %cursed1
+  store i64 %48, i64* %packed1
   %49 = and i64 %20, 0
   %50 = zext i32 %mul21 to i64
   %51 = shl i64 %50, 32
@@ -105,7 +105,7 @@ for.body:                                         ; preds = %for.cond
   %53 = zext i32 %add9 to i64
   %54 = shl i64 %53, 0
   %55 = or i64 %54, %52
-  store i64 %55, i64* %cursed
+  store i64 %55, i64* %packed
   br label %for.inc
 
 for.inc:                                          ; preds = %for.body
@@ -115,7 +115,7 @@ for.inc:                                          ; preds = %for.body
   br label %for.cond
 
 for.end:                                          ; preds = %for.cond
-  %57 = load i64, i64* %cursed
+  %57 = load i64, i64* %packed
   %58 = ashr i64 %57, 32
   %59 = and i64 %58, 4294967295
   %60 = trunc i64 %59 to i32
