@@ -4,41 +4,34 @@
 ### usage: ./run.sh ${benchmark_name} ${input} 
 ### e.g., ./run.sh compress compress.in   or   ./run.sh simple
 
-rm -f *prof* cccp.c test1*
+rm -f *prof* cccp.c test1* new_test*
 
 PATH_MYPASS=${ALLOCA_PATH}                                                    ### Action Required: Specify the path to your pass ###
 NAME_MYPASS=-AllocaPack                                                       ### Action Required: Specify the name for your pass ###
 #BENCH=../src/test1.c
 # BENCH=../src/test_sort.c
-COUNT=5
 
-echo "5" > logs.txt
+# Convert source code to bitcode (IR)
+# This approach has an issue with -O2, so we are going to stick with default optimization level (-O0)
+echo "Converting to bitcode"
+clang -emit-llvm -c test_summation.c -o test_summation.bc
 
-for i in {1..5}; do
-    echo "$i"	
-    for file in ../src/*.c; do 
-        if [ -f "$file" ]; then 
-            echo "$file" >> logs.txt 
-            # Convert source code to bitcode (IR)
-            # This approach has an issue with -O2, so we are going to stick with default optimization level (-O0)
-            clang -emit-llvm -c $file -o test1.bc
+echo "Running Pass"
+# Apply your pass to bitcode (IR)
+opt -load ${PATH_MYPASS} ${NAME_MYPASS} < test_summation.bc > test_summation_opt.bc
 
-            # Apply your pass to bitcode (IR)
-            opt -load ${PATH_MYPASS} ${NAME_MYPASS} < test1.bc > new_test.bc 2>> logs.txt
+clang -O2 test_summation.bc -o test_summation_base
+clang -O2 test_summation_opt.bc -o test_summation_opt
+llvm-dis test_summation_opt.bc
 
-            clang -O2 test1.bc -o test1
-            clang -O2 new_test.bc -o new_test
-            echo "" >> logs.txt
-            echo "Benchmarking $file" >> logs.txt
-            echo "" >> logs.txt
-            echo "Baseline" >> logs.txt
-            (time ./test1 > out) 2>> logs.txt
-            echo "" >> logs.txt
-            echo "Optimized" >> logs.txt
-            (time ./new_test > out_other) 2>> logs.txt
-            echo "" >> logs.txt
+echo ""
+echo "Baseline"
+time ./test_summation_base > out
+echo ""
+echo "Optimized"
+time ./test_summation_opt > out_other
+echo ""
 
-            diff out out_other
-        fi 
-    done
-done
+diff out out_other
+
+rm -f out out_other test_summation_opt.bc test_summation_opt test_summation.bc test_summation_base
