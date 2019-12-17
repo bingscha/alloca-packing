@@ -1,5 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib
+
+matplotlib.rcParams.update({'font.size': 18})
 
 # all metrics available
 metrics = ['inst_count', 'loads', 'stores', 'allocas', 'binary_and_unary', 'time']
@@ -53,3 +56,7 @@ ax.set_ylabel('Percent of Original Value')
 
 
 plt.show()
+
+
+print('Inst Before,', 'Inst After,', 'Allocas Before,', 'Allocas After')
+print([ [v[0]['inst_count'], v[1]['inst_count'], v[0]['allocas'], v[1]['allocas']] for _, v in data.items()])
